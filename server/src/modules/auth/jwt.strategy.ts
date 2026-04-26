@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceRoleClient } from '../../lib/supabase';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -15,20 +15,26 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: jwtSecret,
+      ignoreExpiration: false,
     });
   }
 
-  async validate(payload: any) {
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
 
-    const { data: user } = await supabase
+  async validate(payload: any) {
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    const supabase = getSupabaseServiceRoleClient();
+    const { data: user, error } = await supabase
       .from('users')
       .select(`*, user_branch_roles(*)`)
       .eq('id', payload.sub)
       .single();
+
+    if (error || !user) {
+      throw new UnauthorizedException('User not found');
+    }
 
     return user;
   }

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { getSupabaseAnonClient } from '../../common/lib/supabase';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
@@ -10,6 +14,11 @@ export class AuthService {
     const { data, error } = await supabase.auth.signUp({
       email: payload.email,
       password: payload.password,
+      options: {
+        data: {
+          name: payload.name,
+        },
+      },
     });
 
     if (error) {
@@ -17,11 +26,21 @@ export class AuthService {
     }
 
     return {
-      user: data.user,
-      session: data.session,
       message: data.session
         ? 'Signup successful.'
         : 'Signup successful. Check your email for confirmation.',
+      user: {
+        id: data.user?.id,
+        email: data.user?.email,
+        name: data.user?.user_metadata?.name,
+      },
+      session: data.session
+        ? {
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+            expiresAt: data.session.expires_at,
+          }
+        : null,
     };
   }
 
@@ -37,8 +56,15 @@ export class AuthService {
     }
 
     return {
-      user: data.user,
-      session: data.session,
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+      },
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
     };
   }
 }

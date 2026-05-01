@@ -7,6 +7,7 @@ export const config = {
     isDev: env.NODE_ENV === "development",
     isProd: env.NODE_ENV === "production",
     port: env.PORT,
+    logLevel: env.LOG_LEVEL,
   },
 
   supabase: {

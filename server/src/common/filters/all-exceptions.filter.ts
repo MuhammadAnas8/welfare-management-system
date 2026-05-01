@@ -55,7 +55,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
 
       // Only expose debug info in development
-      ...(config.app.isDev && {
+      ...(config.app.logLevel === 'debug' && {
         debug:
           exception instanceof Error
             ? {

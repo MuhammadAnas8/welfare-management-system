@@ -1,22 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { config } from '../config/app.config';
 
 let serviceRoleClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
-function getRequiredEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY' | 'SUPABASE_ANON_KEY'): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`${name} is not defined`);
-  }
-
-  return value;
-}
-
 function createSupabaseClient(key: string): SupabaseClient {
-  const supabaseUrl = getRequiredEnv('SUPABASE_URL');
-
-  return createClient(supabaseUrl, key, {
+  return createClient(config.supabase.url, key, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -27,16 +16,18 @@ function createSupabaseClient(key: string): SupabaseClient {
 
 export function getSupabaseServiceRoleClient(): SupabaseClient {
   if (!serviceRoleClient) {
-    serviceRoleClient = createSupabaseClient(getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY'));
+    serviceRoleClient = createSupabaseClient(
+      config.supabase.serviceRoleKey,
+    );
   }
-
   return serviceRoleClient;
 }
 
 export function getSupabaseAnonClient(): SupabaseClient {
   if (!anonClient) {
-    anonClient = createSupabaseClient(getRequiredEnv('SUPABASE_ANON_KEY'));
+    anonClient = createSupabaseClient(
+      config.supabase.anonKey,
+    );
   }
-
   return anonClient;
 }

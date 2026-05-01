@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
-import { AppLogger } from './common/logger/app-logger.service';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { AppLogger } from './common/logger/app-logger.service.js';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor.js';
+import { config } from './common/config/app.config.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -18,6 +19,5 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-  await app.listen(process.env.PORT ?? 5000);
-}
+await app.listen(config.app.port);}
 bootstrap();

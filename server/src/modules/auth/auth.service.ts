@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { getSupabaseAnonClient } from '../../lib/supabase';
+import { getSupabaseAnonClient } from '../../common/lib/supabase';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 

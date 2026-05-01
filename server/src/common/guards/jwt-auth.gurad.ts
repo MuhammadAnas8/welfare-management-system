@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
-import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from '../../lib/supabase';
+import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from '../lib/supabase.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

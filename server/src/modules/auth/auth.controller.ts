@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.gurad';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad';
 
 @Controller('auth')
 export class AuthController {

@@ -67,4 +67,15 @@ export class AuthService {
       },
     };
   }
+  getMe(user: any) {
+  return {
+    id: user.id,
+    full_name: user.full_name,
+    email: user.email,
+    global_role: user.global_role,
+    branches: user.user_branch_roles,
+  };
+}
+
+
 }

@@ -6,9 +6,12 @@ import { ConfigModule } from '@nestjs/config';
 import { AppLogger } from './common/logger/app-logger.service.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { SupabaseModule } from './common/supabase/supabase.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 @Module({
   imports: [
-    AuthModule,SupabaseModule,
+    AuthModule,
+    SupabaseModule,
+    UsersModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60, limit: 60 }]

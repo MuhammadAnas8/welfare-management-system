@@ -11,8 +11,5 @@ export class AppController {
   getHealth(): string {
     return "Health: OK";
   }
-  @Get('users')
-  getUsers() {
-    return [{ id: 1, name: 'Ali'  }, { id: 2, name: 'Veli' }, { id: 3, name: 'Ayşe' }];
-  }
+
 }

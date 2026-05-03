@@ -1,19 +1,20 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
+import { GlobalRole } from '../enums/roles.enum';
 
 export class UpdateUserDto {
-  @ApiPropertyOptional({ example: 'Muhammad Ali' })
+  @ApiPropertyOptional({ example: 'Muhammad Ali', description: 'Full name of the user' })
   @IsOptional()
   @IsString()
   full_name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Status of the user' })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
 
-  @ApiPropertyOptional({ example: 'admin' })
+  @ApiPropertyOptional({ enum: GlobalRole, example: GlobalRole.ADMIN, description: 'Global system role' })
   @IsOptional()
-  @IsEnum(['super_admin', 'admin', 'editor', 'viewer'])
-  global_role?: string;
+  @IsEnum(GlobalRole)
+  global_role?: GlobalRole;
 }

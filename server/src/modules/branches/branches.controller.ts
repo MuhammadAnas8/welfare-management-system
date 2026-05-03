@@ -1,0 +1,52 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+import { BranchesService } from './branches.service.js';
+import { CreateBranchDto } from './dto/create-branch.dto.js';
+import { UpdateBranchDto } from './dto/update-branch.dto.js';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/guards/current-user.decorator.js';
+import { User } from '../users/interfaces/user.interface.js';
+
+@ApiTags('Branches')
+@ApiBearerAuth()
+@Controller('branches')
+@UseGuards(JwtAuthGuard)
+export class BranchesController {
+  constructor(private readonly branchesService: BranchesService) {}
+
+  @ApiOperation({ summary: 'Get all branches' })
+  @Get()
+  findAll() {
+    return this.branchesService.findAll();
+  }
+
+  @ApiOperation({ summary: 'Get branch by ID' })
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.branchesService.findOne(id);
+  }
+
+  @ApiOperation({ summary: 'Create new branch (Admin only)' })
+  @Post()
+  create(@Body() dto: CreateBranchDto, @CurrentUser() currentUser: User) {
+    return this.branchesService.create(dto, currentUser);
+  }
+
+  @ApiOperation({ summary: 'Update branch (Admin only)' })
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBranchDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.branchesService.update(id, dto, currentUser);
+  }
+}

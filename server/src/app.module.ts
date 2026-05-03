@@ -9,6 +9,7 @@ import { SupabaseModule } from './common/supabase/supabase.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AuditModule } from './common/audit/audit.module.js';
 import { BranchesModule } from './modules/branches/branches.module.js';
+import { PermissionModule } from './common/permissions/permission.module.js';
 @Module({
   imports: [
     AuthModule,
@@ -16,6 +17,7 @@ import { BranchesModule } from './modules/branches/branches.module.js';
     UsersModule,
     AuditModule,
     BranchesModule,
+    PermissionModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60, limit: 60 }]

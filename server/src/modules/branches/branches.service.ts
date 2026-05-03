@@ -1,10 +1,9 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service.js';
 import { AuditService } from '../../common/audit/audit.service.js';
 import { CreateBranchDto } from './dto/create-branch.dto.js';
 import { UpdateBranchDto } from './dto/update-branch.dto.js';
 import { User, Branch } from '../users/interfaces/user.interface.js';
-import { GlobalRole } from '../users/enums/roles.enum.js';
 
 @Injectable()
 export class BranchesService {
@@ -12,12 +11,6 @@ export class BranchesService {
     private readonly supabase: SupabaseService,
     private readonly auditService: AuditService,
   ) {}
-
-  private checkAdminPermission(user: User) {
-    if (![GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN].includes(user.global_role)) {
-      throw new ForbiddenException('Only system admins can manage branches');
-    }
-  }
 
   async findAll() {
     return this.supabase.query(
@@ -32,8 +25,6 @@ export class BranchesService {
   }
 
   async create(dto: CreateBranchDto, currentUser: User) {
-    this.checkAdminPermission(currentUser);
-
     const data = await this.supabase.single<Branch>(
       this.supabase.service
         .from('branches')
@@ -57,8 +48,6 @@ export class BranchesService {
   }
 
   async update(id: string, dto: UpdateBranchDto, currentUser: User) {
-    this.checkAdminPermission(currentUser);
-
     const oldData = await this.findOne(id);
 
     const data = await this.supabase.single<Branch>(

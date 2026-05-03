@@ -14,11 +14,14 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/guards/current-user.decorator.js';
 import { User } from '../users/interfaces/user.interface.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { GlobalRole } from '../users/enums/roles.enum.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
 @Controller('branches')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
@@ -35,12 +38,14 @@ export class BranchesController {
   }
 
   @ApiOperation({ summary: 'Create new branch (Admin only)' })
+  @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Post()
   create(@Body() dto: CreateBranchDto, @CurrentUser() currentUser: User) {
     return this.branchesService.create(dto, currentUser);
   }
 
   @ApiOperation({ summary: 'Update branch (Admin only)' })
+  @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Patch(':id')
   update(
     @Param('id') id: string,

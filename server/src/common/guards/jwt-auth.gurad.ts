@@ -47,7 +47,7 @@ export class JwtAuthGuard implements CanActivate {
     const profile = await this.supabaseService.single(
       this.supabaseService.service
         .from('users')
-        .select('*, roles:user_branch_roles!user_branch_roles_user_id_fkey(*)')
+        .select('*, user_branch_roles!user_branch_roles_user_id_fkey(*)')
         .eq('id', authData.user.id)
         .single(),
     );

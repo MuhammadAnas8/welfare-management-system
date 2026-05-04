@@ -7,30 +7,24 @@ import {
   Body,
   Param,
   UseGuards,
-  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { AssignUserRoleDto } from './dto/assign-role.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from './interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
-import { AuditService } from '../../common/audit/audit.service.js';
-import { PermissionService } from '../../common/permissions/permission.service.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 
 @ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly permissionService: PermissionService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @ApiOperation({
     operationId: 'getAllUsers',
@@ -62,11 +56,6 @@ export class UsersController {
     @Body() updateDto: UpdateUserDto,
     @CurrentUser() currentUser: User,
   ) {
-    if (!this.permissionService.canUpdateUser(currentUser, id, updateDto)) {
-      throw new ForbiddenException(
-        'Sorry! You are not allowed to perform this action.',
-      );
-    }
     return this.usersService.update(id, updateDto, currentUser);
   }
 

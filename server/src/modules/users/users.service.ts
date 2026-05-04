@@ -23,7 +23,6 @@ export class UsersService {
     branchId: string,
     role: BranchRole,
   ): boolean {
-    // Super Admin and Admin can assign any role
     if (
       [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN].includes(
         currentUser.global_role,
@@ -32,17 +31,12 @@ export class UsersService {
       return true;
     }
 
-    // Find user's role in this branch
     const branchAssignment = currentUser.user_branch_roles?.find(
       (r) => r.branch_id === branchId,
     );
 
     if (!branchAssignment) return false;
-
-    // Must be branch_admin to assign roles in a branch
     if (branchAssignment.branch_role !== BranchRole.ADMIN) return false;
-
-    // Branch Admin cannot assign the branch_admin role to others
     if (role === BranchRole.ADMIN) return false;
 
     return true;
@@ -50,7 +44,11 @@ export class UsersService {
 
   async findAll() {
     return this.supabase.query(
-      this.supabase.service.from('users').select('*, roles:user_branch_roles!user_branch_roles_user_id_fkey(*)'),
+      this.supabase.service
+        .from('users')
+        .select(
+          '*, roles:user_branch_roles!user_branch_roles_user_id_fkey(*)',
+        ),
     );
   }
 
@@ -58,14 +56,19 @@ export class UsersService {
     return this.supabase.single(
       this.supabase.service
         .from('users')
-        .select('*, roles:user_branch_roles!user_branch_roles_user_id_fkey(*)')
+        .select(
+          '*, roles:user_branch_roles!user_branch_roles_user_id_fkey(*)',
+        )
         .eq('id', id)
         .single(),
     );
   }
 
-  async update(id: string, updateDto: UpdateUserDto) {
-    return this.supabase.single(
+  async update(id: string, updateDto: UpdateUserDto, currentUser: User) {
+    const oldData = await this.findOne(id);
+
+    // 2. Perform update
+    const data = await this.supabase.single(
       this.supabase.service
         .from('users')
         .update(updateDto)
@@ -73,18 +76,27 @@ export class UsersService {
         .select()
         .single(),
     );
+
+    // 3. Log the change
+    await this.auditService.log(
+      currentUser,
+      'UPDATE_PROFILE',
+      'users',
+      id,
+      updateDto,
+      oldData,
+    );
+
+    return data;
   }
 
   async removeBranchRole(roleId: string, currentUser: User) {
-    // Optional: Add permission check for deletion
-    
-    // Get existing role for audit
     const existingRole = await this.supabase.single(
       this.supabase.service
         .from('user_branch_roles')
         .select('*')
         .eq('id', roleId)
-        .single()
+        .single(),
     );
 
     await this.supabase.query(
@@ -97,7 +109,7 @@ export class UsersService {
       'user_branch_roles',
       roleId,
       null,
-      existingRole
+      existingRole,
     );
 
     return { success: true };
@@ -106,13 +118,10 @@ export class UsersService {
   async assignOrUpdateBranchRole(dto: AssignUserRoleDto, currentUser: User) {
     const { user_id, branch_id, branch_role } = dto;
 
-    // 🔐 Permission check
     if (!this.canAssignRole(currentUser, branch_id, branch_role)) {
       throw new ForbiddenException('You cannot assign this role');
     }
 
-    // 🔄 UPSERT
-    // Note: This requires a unique constraint on (user_id, branch_id) in the DB
     const { data, error } = await this.supabase.service
       .from('user_branch_roles')
       .upsert(
@@ -132,7 +141,6 @@ export class UsersService {
       throw new BadRequestException(error.message);
     }
 
-    // 🧾 Audit
     await this.auditService.log(
       currentUser,
       'ASSIGN_ROLE',

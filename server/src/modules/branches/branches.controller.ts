@@ -25,26 +25,26 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
-  @ApiOperation({ summary: 'Get all branches' })
+  @ApiOperation({operationId: 'getAllBranches' ,summary: 'Get all branches' })
   @Get()
   findAll() {
     return this.branchesService.findAll();
   }
 
-  @ApiOperation({ summary: 'Get branch by ID' })
+  @ApiOperation({operationId: 'getBranchById' , summary: 'Get branch by ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.branchesService.findOne(id);
   }
 
-  @ApiOperation({ summary: 'Create new branch (Admin only)' })
+  @ApiOperation({operationId: 'createBranch' , summary: 'Create new branch (Admin only)' })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Post()
   create(@Body() dto: CreateBranchDto, @CurrentUser() currentUser: User) {
     return this.branchesService.create(dto, currentUser);
   }
 
-  @ApiOperation({ summary: 'Update branch (Admin only)' })
+  @ApiOperation({operationId: 'updateBranch' , summary: 'Update branch (Admin only)' })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Patch(':id')
   update(

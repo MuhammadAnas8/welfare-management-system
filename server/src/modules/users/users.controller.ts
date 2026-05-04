@@ -27,39 +27,61 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @ApiOperation({operationId: 'getAllUsers' , summary: 'Get all users (Admins only)' })
+  @ApiOperation({
+    operationId: 'getAllUsers',
+    summary: 'Get all users (Admins only)',
+  })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Get()
   findAll() {
     return this.usersService.findAll();
   }
 
-  @ApiOperation({operationId: 'getUserById' , summary: 'Get user information by ID' })
+  @ApiOperation({
+    operationId: 'getUserById',
+    summary: 'Get user information by ID',
+  })
+  @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
-  @ApiOperation({operationId: 'updateUser' , summary: 'Update user information (Self or Admin)' })
+  @ApiOperation({
+    operationId: 'updateUser',
+    summary: 'Update user information (Self or Admin)',
+  })
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateUserDto,
     @CurrentUser() currentUser: User,
   ) {
-    // Basic protection: only admins can change global_role or is_active
+    const isAdmin = [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN].includes(
+      currentUser.global_role,
+    );
+    const isSelf = currentUser.id === id;
+
+    // 1. Ownership/Admin Check
+    if (!isAdmin && !isSelf) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+
+    // 2. Sensitive Field Protection
     if (
       (updateDto.global_role || updateDto.is_active !== undefined) &&
-      ![GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN].includes(
-        currentUser.global_role,
-      )
+      !isAdmin
     ) {
       throw new ForbiddenException('Only admins can update roles or status');
     }
-    return this.usersService.update(id, updateDto);
+
+    return this.usersService.update(id, updateDto, currentUser);
   }
 
-  @ApiOperation({operationId: 'assignBranchRole' , summary: 'Assign or Update user branch role' })
+  @ApiOperation({
+    operationId: 'assignBranchRole',
+    summary: 'Assign or Update user branch role',
+  })
   @Roles({
     global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN],
     branch: [BranchRole.ADMIN],
@@ -72,7 +94,10 @@ export class UsersController {
     return this.usersService.assignOrUpdateBranchRole(dto, currentUser);
   }
 
-  @ApiOperation({operationId: 'removeBranchRole' , summary: 'Remove user branch role' })
+  @ApiOperation({
+    operationId: 'removeBranchRole',
+    summary: 'Remove user branch role',
+  })
   @Roles({
     global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN],
     branch: [BranchRole.ADMIN],

@@ -12,7 +12,7 @@ import { CreateBranchDto } from './dto/create-branch.dto.js';
 import { UpdateBranchDto } from './dto/update-branch.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/guards/current-user.decorator.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from '../users/interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole } from '../users/enums/roles.enum.js';

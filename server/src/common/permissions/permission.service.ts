@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { User, UserBranchRole } from '../../modules/users/interfaces/user.interface.js';
 import { GlobalRole, BranchRole } from '../../modules/users/enums/roles.enum.js';
+import { UpdateUserDto } from '../../modules/users/dto/update-user.dto.js';
 
 @Injectable()
 export class PermissionService {
@@ -13,6 +14,7 @@ export class PermissionService {
     if (user.global_role === GlobalRole.SUPER_ADMIN) return true;
     return roles.includes(user.global_role);
   }
+
 
 
   hasBranchPermission(
@@ -38,7 +40,7 @@ export class PermissionService {
 
 
   getAuthorizedBranches(user: User, role?: BranchRole): string[] {
-    if (this.isGlobalAdmin(user)) return []; // Empty means "all" in context of global admins
+    if (this.isGlobalAdmin(user)) return []; 
 
     return (user.user_branch_roles || [])
       .filter((r) => !role || r.branch_role === role)
@@ -52,4 +54,22 @@ export class PermissionService {
       );
     }
   }
+
+  canUpdateUser(currentUser: User, targetUserId: string, dto: UpdateUserDto): boolean {
+  const isAdmin = this.hasGlobalRole(currentUser, [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN]);
+  const isSuperAdmin = currentUser.global_role === GlobalRole.SUPER_ADMIN;
+  const isSelf = currentUser.id === targetUserId;
+
+  if (!isAdmin && !isSelf) return false;
+
+  if ((dto.global_role || dto.is_active !== undefined) && !isAdmin) {
+    return false;
+  }
+
+  if (dto.global_role === GlobalRole.SUPER_ADMIN && !isSuperAdmin) {
+    return false;
+  }
+
+  return true;
+}
 }

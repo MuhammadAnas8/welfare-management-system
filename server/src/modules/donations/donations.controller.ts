@@ -40,7 +40,7 @@ export class DonationsController {
   @Roles({ branch: [BranchRole.ADMIN, BranchRole.EDITOR] })
   @Post()
   create(@Body() dto: CreateDonationDto, @CurrentUser() currentUser: User) {
-    return this.donationsService.create(dto, currentUser);
+    return this.donationsService.createDonation(dto, currentUser);
   }
 
   @ApiOperation({ summary: 'List donations with branch filtering and pagination' })
@@ -51,13 +51,13 @@ export class DonationsController {
     @Query('branchId') branchId: string,
     @CurrentUser() currentUser: User,
   ) {
-    return this.donationsService.findAll(currentUser, pagination, branchId);
+    return this.donationsService.findAllDonations(currentUser, pagination, branchId);
   }
 
   @ApiOperation({ summary: 'Get donation by ID' })
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() currentUser: User) {
-    return this.donationsService.findOne(id, currentUser);
+    return this.donationsService.findOneDonation(id, currentUser);
   }
 
   @ApiOperation({ summary: 'Update donation (Within 7 days)' })

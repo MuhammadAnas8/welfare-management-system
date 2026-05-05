@@ -31,10 +31,6 @@ export class DonationsService {
     );
   }
 
-  /**
-   * Application-level check for the 7-day edit lock.
-   * This complements the DB trigger `trg_donation_edit_lock`.
-   */
   private checkEditLock(donation: Donation) {
     const lockTime = new Date(donation.edit_locked_at).getTime();
     const now = new Date().getTime();
@@ -56,7 +52,7 @@ export class DonationsService {
     );
   }
 
-  async create(dto: CreateDonationDto, currentUser: User) {
+  async createDonation(dto: CreateDonationDto, currentUser: User) {
     this.permissionService.checkBranchAccess(currentUser, dto.branch_id, [
       BranchRole.ADMIN,
       BranchRole.EDITOR,
@@ -70,7 +66,7 @@ export class DonationsService {
           status: DonationStatus.ACTIVE,
           created_by: currentUser.id,
         })
-        .select()
+        .select('id,branch_id,donor_name,donor_phone,amount,currency,status')
         .single(),
     );
 
@@ -84,7 +80,7 @@ export class DonationsService {
     return data;
   }
 
-  async findAll(currentUser: User, pagination: PaginationDto, branchId?: string) {
+  async findAllDonations(currentUser: User, pagination: PaginationDto, branchId?: string) {
     let query = this.supabase.service
       .from('donations')
       .select('*', { count: 'exact' });
@@ -104,7 +100,7 @@ export class DonationsService {
     );
   }
 
-  async findOne(id: string, currentUser: User) {
+  async findOneDonation(id: string, currentUser: User) {
     const donation = await this.getDonationOrThrow(id);
     this.permissionService.checkBranchAccess(currentUser, donation.branch_id);
     return donation;

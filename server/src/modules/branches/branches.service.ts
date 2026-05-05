@@ -4,6 +4,7 @@ import { AuditService } from '../../common/audit/audit.service.js';
 import { CreateBranchDto } from './dto/create-branch.dto.js';
 import { UpdateBranchDto } from './dto/update-branch.dto.js';
 import { User, Branch } from '../users/interfaces/user.interface.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 
 @Injectable()
 export class BranchesService {
@@ -12,9 +13,14 @@ export class BranchesService {
     private readonly auditService: AuditService,
   ) {}
 
-  async findAll() {
-    return this.supabase.query(
-      this.supabase.service.from('branches').select('*').order('name'),
+  async findAll(pagination: PaginationDto) {
+    const query = this.supabase.service
+      .from('branches')
+      .select('*', { count: 'exact' });
+
+    return this.supabase.paginate<Branch>(
+      query.order('name'),
+      pagination,
     );
   }
 

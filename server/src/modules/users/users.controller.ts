@@ -7,6 +7,8 @@ import {
   Body,
   Param,
   UseGuards,
+  ForbiddenException,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
@@ -17,6 +19,7 @@ import { User } from './interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 
 @ApiTags('Users')
@@ -32,8 +35,8 @@ export class UsersController {
   })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() pagination: PaginationDto) {
+    return this.usersService.findAll(pagination);
   }
 
   @ApiOperation({

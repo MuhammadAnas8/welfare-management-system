@@ -1,7 +1,8 @@
 import { DonationStatus } from '../enums/donation.enum.js';
+import { CurrencyCode } from '../enums/currency.enum.js';
 
 export interface Currency {
-  code: string;
+  code: CurrencyCode;
   name: string;
   symbol: string;
   is_active: boolean;
@@ -13,7 +14,7 @@ export interface Donation {
   donor_name: string;
   donor_phone: string | null;
   amount: number;
-  currency: string;
+  currency: CurrencyCode;
   status: DonationStatus;
   void_reason: string | null;
   voided_by: string | null;
@@ -29,7 +30,7 @@ export interface DonationTransfer {
   from_branch_id: string;
   to_branch_id: string;
   amount_original: number;
-  currency_original: string;
+  currency_original: CurrencyCode;
   estimated_pkr: number;
   received_pkr: number | null;
   status: string;

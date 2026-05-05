@@ -15,6 +15,7 @@ import { ConfirmTransferDto } from './dto/confirm-transfer.dto.js';
 import { DonationStatus, TransferStatus } from './enums/donation.enum.js';
 import { Donation, DonationTransfer, Currency } from './interfaces/donation.interface.js';
 import { BranchRole } from '../users/enums/roles.enum.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 
 @Injectable()
 export class DonationsService {
@@ -83,8 +84,10 @@ export class DonationsService {
     return data;
   }
 
-  async findAll(currentUser: User, branchId?: string) {
-    let query = this.supabase.service.from('donations').select('*');
+  async findAll(currentUser: User, pagination: PaginationDto, branchId?: string) {
+    let query = this.supabase.service
+      .from('donations')
+      .select('*', { count: 'exact' });
 
     if (branchId) {
       this.permissionService.checkBranchAccess(currentUser, branchId);
@@ -95,7 +98,10 @@ export class DonationsService {
       query = query.in('branch_id', authorizedBranches);
     }
 
-    return this.supabase.query(query.order('created_at', { ascending: false }));
+    return this.supabase.paginate<Donation>(
+      query.order('created_at', { ascending: false }),
+      pagination,
+    );
   }
 
   async findOne(id: string, currentUser: User) {
@@ -251,8 +257,10 @@ export class DonationsService {
     return data;
   }
 
-  async getTransfers(currentUser: User, branchId?: string) {
-    let query = this.supabase.service.from('donation_transfers').select('*');
+  async getTransfers(currentUser: User, pagination: PaginationDto, branchId?: string) {
+    let query = this.supabase.service
+      .from('donation_transfers')
+      .select('*', { count: 'exact' });
 
     if (branchId) {
       this.permissionService.checkBranchAccess(currentUser, branchId);
@@ -265,6 +273,9 @@ export class DonationsService {
       query = query.in('from_branch_id', authorizedBranches);
     }
 
-    return this.supabase.query(query.order('submitted_at', { ascending: false }));
+    return this.supabase.paginate<DonationTransfer>(
+      query.order('submitted_at', { ascending: false }),
+      pagination,
+    );
   }
 }

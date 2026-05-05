@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsString, IsNumber, IsOptional, Min, IsEnum } from 'class-validator';
+import { CurrencyCode } from '../enums/currency.enum.js';
 
 export class UpdateDonationDto {
   @ApiPropertyOptional({ example: 'John Doe' })
@@ -17,8 +18,8 @@ export class UpdateDonationDto {
   @Min(0)
   amount?: number;
 
-  @ApiPropertyOptional({ example: 'PKR' })
-  @IsString()
+  @ApiPropertyOptional({ enum: CurrencyCode, example: CurrencyCode.PKR })
   @IsOptional()
-  currency?: string;
+  @IsEnum(CurrencyCode)
+  currency?: CurrencyCode;
 }

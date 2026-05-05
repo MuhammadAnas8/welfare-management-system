@@ -19,10 +19,9 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { BranchRole, GlobalRole } from '../users/enums/roles.enum.js';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
-// import { CurrentUser } from '../../common/guards/current-user.decorator.js';
 import { User } from '../users/interfaces/user.interface.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
-import { AppLogger } from '../../common/logger/app-logger.service.js';
 
 @ApiTags('Donations')
 @ApiBearerAuth()
@@ -38,21 +37,21 @@ export class DonationsController {
   }
 
   @ApiOperation({ summary: 'Create a new donation' })
-  @Roles({ branch: [BranchRole.ADMIN, BranchRole.EDITOR]})
+  @Roles({ branch: [BranchRole.ADMIN, BranchRole.EDITOR] })
   @Post()
   create(@Body() dto: CreateDonationDto, @CurrentUser() currentUser: User) {
-    new AppLogger().log('Creating donation', { dto, userId: currentUser.id } ,"branch roles: " + currentUser.user_branch_roles?.map(r => `${r.branch_id}:${r.branch_role}`).join(', '));
     return this.donationsService.create(dto, currentUser);
   }
 
-  @ApiOperation({ summary: 'List donations with branch filtering' })
+  @ApiOperation({ summary: 'List donations with branch filtering and pagination' })
   @ApiQuery({ name: 'branchId', required: false })
   @Get()
   findAll(
+    @Query() pagination: PaginationDto,
     @Query('branchId') branchId: string,
     @CurrentUser() currentUser: User,
   ) {
-    return this.donationsService.findAll(currentUser, branchId);
+    return this.donationsService.findAll(currentUser, pagination, branchId);
   }
 
   @ApiOperation({ summary: 'Get donation by ID' })
@@ -73,7 +72,7 @@ export class DonationsController {
   }
 
   @ApiOperation({ summary: 'Void a donation (Admin only)' })
-  @Roles({ branch: [BranchRole.ADMIN] , global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
+  @Roles({ branch: [BranchRole.ADMIN] })
   @Patch(':id/void')
   void(
     @Param('id') id: string,
@@ -92,14 +91,15 @@ export class DonationsController {
     return this.donationsService.submitTransfer(dto, currentUser);
   }
 
-  @ApiOperation({ summary: 'List transfers with branch filtering' })
+  @ApiOperation({ summary: 'List transfers with branch filtering and pagination' })
   @ApiQuery({ name: 'branchId', required: false })
   @Get('transfers/history')
   getTransfers(
+    @Query() pagination: PaginationDto,
     @Query('branchId') branchId: string,
     @CurrentUser() currentUser: User,
   ) {
-    return this.donationsService.getTransfers(currentUser, branchId);
+    return this.donationsService.getTransfers(currentUser, pagination, branchId);
   }
 
   @ApiOperation({ summary: 'Confirm received transfer (Head Office Admin only)' })

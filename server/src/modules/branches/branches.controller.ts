@@ -6,17 +6,19 @@ import {
   Body,
   Param,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { BranchesService } from './branches.service.js';
 import { CreateBranchDto } from './dto/create-branch.dto.js';
 import { UpdateBranchDto } from './dto/update-branch.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from '../users/interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole } from '../users/enums/roles.enum.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
@@ -25,26 +27,26 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
-  @ApiOperation({operationId: 'getAllBranches' ,summary: 'Get all branches' })
+  @ApiOperation({ summary: 'Get all branches with pagination' })
   @Get()
-  findAll() {
-    return this.branchesService.findAll();
+  findAll(@Query() pagination: PaginationDto) {
+    return this.branchesService.findAll(pagination);
   }
 
-  @ApiOperation({operationId: 'getBranchById' , summary: 'Get branch by ID' })
+  @ApiOperation({ summary: 'Get branch by ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.branchesService.findOne(id);
   }
 
-  @ApiOperation({operationId: 'createBranch' , summary: 'Create new branch (Admin only)' })
+  @ApiOperation({ summary: 'Create new branch (Admin only)' })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Post()
   create(@Body() dto: CreateBranchDto, @CurrentUser() currentUser: User) {
     return this.branchesService.create(dto, currentUser);
   }
 
-  @ApiOperation({operationId: 'updateBranch' , summary: 'Update branch (Admin only)' })
+  @ApiOperation({ summary: 'Update branch (Admin only)' })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Patch(':id')
   update(

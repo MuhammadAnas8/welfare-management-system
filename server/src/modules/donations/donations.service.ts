@@ -12,9 +12,10 @@ import { UpdateDonationDto } from './dto/update-donation.dto.js';
 import { VoidDonationDto } from './dto/void-donation.dto.js';
 import { CreateTransferDto } from './dto/create-transfer.dto.js';
 import { ConfirmTransferDto } from './dto/confirm-transfer.dto.js';
-import { DonationStatus, TransferStatus } from './enums/donation.enum.js';
+import { TransferStatus } from './enums/donation.enum.js';
 import { Donation, DonationTransfer, Currency } from './interfaces/donation.interface.js';
 import { BranchRole } from '../users/enums/roles.enum.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 
 @Injectable()
 export class DonationsService {
@@ -27,13 +28,10 @@ export class DonationsService {
   private async getDonationOrThrow(id: string): Promise<Donation> {
     return this.supabase.single<Donation>(
       this.supabase.service.from('donations').select('*').eq('id', id).single(),
+      `Donation with ID ${id} not found`,
     );
   }
 
-  /**
-   * Application-level check for the 7-day edit lock.
-   * This complements the DB trigger `trg_donation_edit_lock`.
-   */
   private checkEditLock(donation: Donation) {
     const lockTime = new Date(donation.edit_locked_at).getTime();
     const now = new Date().getTime();
@@ -55,18 +53,32 @@ export class DonationsService {
     );
   }
 
-  async create(dto: CreateDonationDto, currentUser: User) {
+  async createDonation(dto: CreateDonationDto, currentUser: User) {
+    // 1. Permission Check
     this.permissionService.checkBranchAccess(currentUser, dto.branch_id, [
       BranchRole.ADMIN,
       BranchRole.EDITOR,
     ]);
 
+    // 2. 🔍 Validate Branch exists (Simplified)
+    await this.supabase.single(
+      this.supabase.service.from('branches').select('id').eq('id', dto.branch_id).single(),
+      `Branch with ID ${dto.branch_id} not found.`,
+    );
+
+    // 3. 🔍 Validate Currency exists (Simplified)
+    await this.supabase.single(
+      this.supabase.service.from('currencies').select('code').eq('code', dto.currency).eq('is_active', true).single(),
+      `Invalid or inactive currency code: ${dto.currency}`,
+    );
+
+    // 4. Perform Insert
     const data = await this.supabase.single<Donation>(
       this.supabase.service
         .from('donations')
         .insert({
           ...dto,
-          status: DonationStatus.ACTIVE,
+          is_voided: false,
           created_by: currentUser.id,
         })
         .select()
@@ -83,39 +95,38 @@ export class DonationsService {
     return data;
   }
 
-  async findAll(currentUser: User, branchId?: string) {
-    let query = this.supabase.service.from('donations').select('*');
+  async findAllDonations(currentUser: User, pagination: PaginationDto, branchId?: string) {
+    let query = this.supabase.service
+      .from('donations')
+      .select('*', { count: 'exact' });
 
-    if (branchId) {
-      this.permissionService.checkBranchAccess(currentUser, branchId);
-      query = query.eq('branch_id', branchId);
-    } else if (!this.permissionService.isGlobalAdmin(currentUser)) {
-      const authorizedBranches =
-        this.permissionService.getAuthorizedBranches(currentUser);
-      query = query.in('branch_id', authorizedBranches);
-    }
+    query = this.permissionService.applyVisibilityFilter(query, currentUser, branchId);
 
-    return this.supabase.query(query.order('created_at', { ascending: false }));
+    return this.supabase.paginate<Donation>(
+      query.order('created_at', { ascending: false }),
+      pagination,
+    );
   }
 
-  async findOne(id: string, currentUser: User) {
+  async findOneDonation(id: string, currentUser: User) {
     const donation = await this.getDonationOrThrow(id);
     this.permissionService.checkBranchAccess(currentUser, donation.branch_id);
+
     return donation;
   }
 
   async update(id: string, dto: UpdateDonationDto, currentUser: User) {
     const donation = await this.getDonationOrThrow(id);
+
     this.permissionService.checkBranchAccess(currentUser, donation.branch_id, [
       BranchRole.ADMIN,
       BranchRole.EDITOR,
     ]);
 
-    if (donation.status === DonationStatus.VOIDED) {
+    if (donation.is_voided) {
       throw new BadRequestException('Cannot update a voided donation');
     }
 
-    // Enforce 7-day lock
     this.checkEditLock(donation);
 
     const data = await this.supabase.single<Donation>(
@@ -147,23 +158,11 @@ export class DonationsService {
       BranchRole.ADMIN,
     ]);
 
-    if (donation.status === DonationStatus.VOIDED) {
-      throw new BadRequestException('Donation is already voided');
-    }
-
-    const data = await this.supabase.single<Donation>(
-      this.supabase.service
-        .from('donations')
-        .update({
-          status: DonationStatus.VOIDED,
-          void_reason: dto.reason,
-          voided_by: currentUser.id,
-          voided_at: new Date(),
-          updated_at: new Date(),
-        })
-        .eq('id', id)
-        .select()
-        .single(),
+    const { data, oldData } = await this.supabase.voidRecord<Donation>(
+      'donations',
+      id,
+      dto.reason,
+      currentUser.id,
     );
 
     await this.auditService.log(
@@ -172,8 +171,9 @@ export class DonationsService {
       'donations',
       id,
       dto,
-      donation,
+      oldData,
     );
+
     return data;
   }
 
@@ -183,6 +183,22 @@ export class DonationsService {
     this.permissionService.checkBranchAccess(currentUser, dto.from_branch_id, [
       BranchRole.ADMIN,
     ]);
+
+    // Simplified Validations using improved .single()
+    await this.supabase.single(
+      this.supabase.service.from('branches').select('id').eq('id', dto.from_branch_id).single(),
+      'Source branch not found',
+    );
+
+    await this.supabase.single(
+      this.supabase.service.from('branches').select('id').eq('id', dto.to_branch_id).single(),
+      'Target branch not found',
+    );
+
+    await this.supabase.single(
+      this.supabase.service.from('currencies').select('code').eq('code', dto.currency_original).eq('is_active', true).single(),
+      'Invalid currency',
+    );
 
     const data = await this.supabase.single<DonationTransfer>(
       this.supabase.service
@@ -215,11 +231,8 @@ export class DonationsService {
     }
 
     const transfer = await this.supabase.single<DonationTransfer>(
-      this.supabase.service
-        .from('donation_transfers')
-        .select('*')
-        .eq('id', id)
-        .single(),
+      this.supabase.service.from('donation_transfers').select('*').eq('id', id).single(),
+      `Transfer with ID ${id} not found`,
     );
 
     if (transfer.status !== TransferStatus.PENDING) {
@@ -251,8 +264,10 @@ export class DonationsService {
     return data;
   }
 
-  async getTransfers(currentUser: User, branchId?: string) {
-    let query = this.supabase.service.from('donation_transfers').select('*');
+  async getTransfers(currentUser: User, pagination: PaginationDto, branchId?: string) {
+    let query = this.supabase.service
+      .from('donation_transfers')
+      .select('*', { count: 'exact' });
 
     if (branchId) {
       this.permissionService.checkBranchAccess(currentUser, branchId);
@@ -265,6 +280,9 @@ export class DonationsService {
       query = query.in('from_branch_id', authorizedBranches);
     }
 
-    return this.supabase.query(query.order('submitted_at', { ascending: false }));
+    return this.supabase.paginate<DonationTransfer>(
+      query.order('submitted_at', { ascending: false }),
+      pagination,
+    );
   }
 }

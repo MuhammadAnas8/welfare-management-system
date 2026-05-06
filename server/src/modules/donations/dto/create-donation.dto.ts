@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsNumber, IsUUID, IsOptional, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsUUID, IsOptional, Min, IsEnum } from 'class-validator';
+import { CurrencyCode } from '../enums/currency.enum.js';
 
 export class CreateDonationDto {
   @ApiProperty({ example: 'branch-uuid' })
@@ -21,8 +22,7 @@ export class CreateDonationDto {
   @Min(0)
   amount!: number;
 
-  @ApiProperty({ example: 'PKR', description: 'Currency code (e.g., PKR, USD, GBP)' })
-  @IsString()
-  @IsNotEmpty()
-  currency!: string;
+  @ApiProperty({ enum: CurrencyCode, example: CurrencyCode.PKR, description: 'Currency code' })
+  @IsEnum(CurrencyCode)
+  currency!: CurrencyCode;
 }

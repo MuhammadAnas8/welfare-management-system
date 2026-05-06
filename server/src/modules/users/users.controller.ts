@@ -7,17 +7,20 @@ import {
   Body,
   Param,
   UseGuards,
+  Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { AssignUserRoleDto } from './dto/assign-role.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/guards/current-user.decorator.js';
 import { User } from './interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
-import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -32,8 +35,8 @@ export class UsersController {
   })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() pagination: PaginationDto) {
+    return this.usersService.findAll(pagination);
   }
 
   @ApiOperation({
@@ -42,7 +45,7 @@ export class UsersController {
   })
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
   }
 
@@ -52,7 +55,7 @@ export class UsersController {
   })
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateUserDto,
     @CurrentUser() currentUser: User,
   ) {
@@ -85,7 +88,7 @@ export class UsersController {
   })
   @Delete('roles/:roleId')
   removeBranchRole(
-    @Param('roleId') roleId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
     @CurrentUser() currentUser: User,
   ) {
     return this.usersService.removeBranchRole(roleId, currentUser);

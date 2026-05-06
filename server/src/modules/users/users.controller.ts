@@ -15,12 +15,12 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { AssignUserRoleDto } from './dto/assign-role.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.gurad.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/guards/current-user.decorator.js';
 import { User } from './interfaces/user.interface.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { PaginationDto } from '../../common/dto/pagination.dto.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 
 @ApiTags('Users')
 @ApiBearerAuth()

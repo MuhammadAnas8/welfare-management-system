@@ -11,6 +11,7 @@ import { User } from './interfaces/user.interface.js';
 import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { AuditService } from '../../common/audit/audit.service.js';
 import { PermissionService } from '../../common/permissions/permission.service.js';
+import { PaginationDto } from '../../common/dto/pagination.dto.js';
 
 @Injectable()
 export class UsersService {
@@ -44,13 +45,14 @@ export class UsersService {
     return true;
   }
 
-  async findAll() {
-    return this.supabase.query(
-      this.supabase.service
-        .from('users')
-        .select(
-          '*, user_branch_roles!user_branch_roles_user_id_fkey(*)',
-        ),
+  async findAll(pagination: PaginationDto) {
+    const query = this.supabase.service
+      .from('users')
+      .select('*, user_branch_roles!user_branch_roles_user_id_fkey(*)', { count: 'exact' });
+
+    return this.supabase.paginate<User>(
+      query.order('created_at', { ascending: false }),
+      pagination,
     );
   }
 

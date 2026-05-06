@@ -1,4 +1,3 @@
-import { DonationStatus } from '../enums/donation.enum.js';
 
 export interface Currency {
   code: string;
@@ -14,7 +13,7 @@ export interface Donation {
   donor_phone: string | null;
   amount: number;
   currency: string;
-  status: DonationStatus;
+  is_voided: boolean;
   void_reason: string | null;
   voided_by: string | null;
   voided_at: Date | null;

@@ -42,12 +42,19 @@ export class RolesGuard implements CanActivate {
 
     // 2. Check Branch Roles (if applicable)
     if (rolesMetadata.branch && rolesMetadata.branch.length > 0) {
+
+      if (this.permissionService.isGlobalAdmin(user)) {
+        return true;
+      }
+
       // Try to find branchId in request (params, body, or query)
       const branchId =
         request.params.branchId ||
+        request.params.branch_id ||
         request.body.branchId ||
         request.body.branch_id ||
-        request.query.branchId;
+        request.query.branchId ||
+        request.query.branch_id;
 
       if (branchId) {
         if (
@@ -60,8 +67,8 @@ export class RolesGuard implements CanActivate {
           return true;
         }
       } else {
-        // If branch roles are required but no branchId is provided, we check if they have ANY valid branch assignment
-        // This is useful for generic routes that might filter data internally
+        // If branch roles are required but no branchId is provided, 
+        // we check if they have ANY valid branch assignment matching the required roles
         const hasAnyBranchRole = user.user_branch_roles?.some((r) =>
           rolesMetadata.branch?.includes(r.branch_role),
         );

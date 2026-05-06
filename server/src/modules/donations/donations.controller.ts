@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { DonationsService } from './donations.service.js';
 import { CreateDonationDto } from './dto/create-donation.dto.js';
@@ -56,15 +57,21 @@ export class DonationsController {
 
   @ApiOperation({ summary: 'Get donation by ID' })
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() currentUser: User) {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: User,
+  ) {
     return this.donationsService.findOneDonation(id, currentUser);
   }
 
   @ApiOperation({ summary: 'Update donation (Within 7 days)' })
-  @Roles({ branch: [BranchRole.ADMIN, BranchRole.EDITOR] })
+  @Roles({
+    branch: [BranchRole.ADMIN, BranchRole.EDITOR],
+    global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN],
+  })
   @Patch(':id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDonationDto,
     @CurrentUser() currentUser: User,
   ) {
@@ -75,7 +82,7 @@ export class DonationsController {
   @Roles({ branch: [BranchRole.ADMIN] })
   @Patch(':id/void')
   void(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: VoidDonationDto,
     @CurrentUser() currentUser: User,
   ) {
@@ -106,7 +113,7 @@ export class DonationsController {
   @Roles({ global: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN] })
   @Post('transfers/:id/confirm')
   confirmTransfer(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ConfirmTransferDto,
     @CurrentUser() currentUser: User,
   ) {

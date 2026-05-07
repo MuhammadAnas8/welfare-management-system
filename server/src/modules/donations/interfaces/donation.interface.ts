@@ -22,7 +22,17 @@ export interface Donation {
   updated_at: Date;
   edit_locked_at: Date;
 }
+export interface DonationRaw  {
+  id: string;
+  donor_name: string;
+  donor_phone: string;
+  amount: number;
+  currency: string;
+  created_at: string;
 
+  branch: { id: string; name: string };
+  created_by: { id: string; full_name: string };
+};
 export interface DonationTransfer {
   id: string;
   from_branch_id: string;

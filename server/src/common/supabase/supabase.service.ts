@@ -52,7 +52,7 @@ export class SupabaseService {
   async paginate<T>(
     queryBuilder: any,
     options: PaginationDto,
-  ): Promise<{ data: T[]; meta: { total: number; page: number; limit: number; lastPage: number } }> {
+  ): Promise<{ data: T[]; success: boolean; timestamp: string; meta: { total: number; page: number; limit: number; lastPage: number } }> {
     const page = options.page || 1;
     const limit = options.limit || 10;
     const from = (page - 1) * limit;
@@ -69,6 +69,7 @@ export class SupabaseService {
     const lastPage = Math.ceil(total / limit);
 
     return {
+      success: true,
       data: data as T[],
       meta: {
         total,
@@ -76,6 +77,7 @@ export class SupabaseService {
         limit,
         lastPage,
       },
+      timestamp: new Date().toISOString(),
     };
   }
 

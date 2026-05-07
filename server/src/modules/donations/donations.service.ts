@@ -13,9 +13,15 @@ import { VoidDonationDto } from './dto/void-donation.dto.js';
 import { CreateTransferDto } from './dto/create-transfer.dto.js';
 import { ConfirmTransferDto } from './dto/confirm-transfer.dto.js';
 import { TransferStatus } from './enums/donation.enum.js';
-import { Donation, DonationTransfer, Currency } from './interfaces/donation.interface.js';
+import {
+  Donation,
+  DonationTransfer,
+  Currency,
+  DonationRaw,
+} from './interfaces/donation.interface.js';
 import { BranchRole } from '../users/enums/roles.enum.js';
 import { PaginationDto } from '../../common/dto/pagination.dto.js';
+import { DonationResponseDto } from './dto/response-donation.dto.js';
 
 @Injectable()
 export class DonationsService {
@@ -24,6 +30,46 @@ export class DonationsService {
     private readonly auditService: AuditService,
     private readonly permissionService: PermissionService,
   ) {}
+  private async validateBranch(branchId: string) {
+    return this.supabase.single(
+      this.supabase.service
+        .from('branches')
+        .select('id')
+        .eq('id', branchId)
+        .single(),
+      `Branch with ID ${branchId} not found.`,
+    );
+  }
+
+  private async validateCurrency(currency: string) {
+    return this.supabase.single(
+      this.supabase.service
+        .from('currencies')
+        .select('code')
+        .eq('code', currency)
+        .eq('is_active', true)
+        .single(),
+      `Invalid or inactive currency code: ${currency}`,
+    );
+  }
+  private mapDonation(d: any): DonationResponseDto {
+    return {
+      id: d.id,
+      donor_name: d.donor_name,
+      donor_phone: d.donor_phone,
+
+      amount: d.amount,
+      currency: d.currency,
+
+      branch_id: d.branch?.id,
+      branch_name: d.branch?.name,
+
+      created_by: d.created_by?.id,
+      created_by_name: d.created_by?.full_name,
+
+      created_at: d.created_at,
+    };
+  }
 
   private async getDonationOrThrow(id: string): Promise<Donation> {
     return this.supabase.single<Donation>(
@@ -54,23 +100,14 @@ export class DonationsService {
   }
 
   async createDonation(dto: CreateDonationDto, currentUser: User) {
-    // 1. Permission Check
     this.permissionService.checkBranchAccess(currentUser, dto.branch_id, [
       BranchRole.ADMIN,
       BranchRole.EDITOR,
     ]);
 
-    // 2. 🔍 Validate Branch exists (Simplified)
-    await this.supabase.single(
-      this.supabase.service.from('branches').select('id').eq('id', dto.branch_id).single(),
-      `Branch with ID ${dto.branch_id} not found.`,
-    );
-
-    // 3. 🔍 Validate Currency exists (Simplified)
-    await this.supabase.single(
-      this.supabase.service.from('currencies').select('code').eq('code', dto.currency).eq('is_active', true).single(),
-      `Invalid or inactive currency code: ${dto.currency}`,
-    );
+    // Validate Branch exists (Simplified)
+    await this.validateBranch(dto.branch_id);
+    await this.validateCurrency(dto.currency);
 
     // 4. Perform Insert
     const data = await this.supabase.single<Donation>(
@@ -95,17 +132,44 @@ export class DonationsService {
     return data;
   }
 
-  async findAllDonations(currentUser: User, pagination: PaginationDto, branchId?: string) {
+  async findAllDonations(
+    currentUser: User,
+    pagination: PaginationDto,
+    branchId?: string,
+  ) {
     let query = this.supabase.service
       .from('donations')
-      .select('*', { count: 'exact' });
+      .select(
+        `
+      id, donor_name, donor_phone, amount, currency, created_at,
 
-    query = this.permissionService.applyVisibilityFilter(query, currentUser, branchId);
+      branch:branches (
+        id, name
+      ),
 
-    return this.supabase.paginate<Donation>(
+      created_by:users!donations_created_by_fkey (
+        id, full_name
+      )
+      `,
+        { count: 'exact' },
+      )
+      .eq('is_voided', false);
+
+    query = this.permissionService.applyVisibilityFilter(
+      query,
+      currentUser,
+      branchId,
+    );
+
+    const result = await this.supabase.paginate<DonationRaw>(
       query.order('created_at', { ascending: false }),
       pagination,
     );
+
+    return {
+      ...result,
+      data: result.data.map((d) => this.mapDonation(d)),
+    };
   }
 
   async findOneDonation(id: string, currentUser: User) {
@@ -117,10 +181,8 @@ export class DonationsService {
 
   async update(id: string, dto: UpdateDonationDto, currentUser: User) {
     const donation = await this.getDonationOrThrow(id);
-
     this.permissionService.checkBranchAccess(currentUser, donation.branch_id, [
       BranchRole.ADMIN,
-      BranchRole.EDITOR,
     ]);
 
     if (donation.is_voided) {
@@ -186,17 +248,30 @@ export class DonationsService {
 
     // Simplified Validations using improved .single()
     await this.supabase.single(
-      this.supabase.service.from('branches').select('id').eq('id', dto.from_branch_id).single(),
+      this.supabase.service
+        .from('branches')
+        .select('id')
+        .eq('id', dto.from_branch_id)
+        .single(),
       'Source branch not found',
     );
 
     await this.supabase.single(
-      this.supabase.service.from('branches').select('id').eq('id', dto.to_branch_id).single(),
+      this.supabase.service
+        .from('branches')
+        .select('id')
+        .eq('id', dto.to_branch_id)
+        .single(),
       'Target branch not found',
     );
 
     await this.supabase.single(
-      this.supabase.service.from('currencies').select('code').eq('code', dto.currency_original).eq('is_active', true).single(),
+      this.supabase.service
+        .from('currencies')
+        .select('code')
+        .eq('code', dto.currency_original)
+        .eq('is_active', true)
+        .single(),
       'Invalid currency',
     );
 
@@ -223,7 +298,11 @@ export class DonationsService {
     return data;
   }
 
-  async confirmTransfer(id: string, dto: ConfirmTransferDto, currentUser: User) {
+  async confirmTransfer(
+    id: string,
+    dto: ConfirmTransferDto,
+    currentUser: User,
+  ) {
     if (!this.permissionService.isGlobalAdmin(currentUser)) {
       throw new ForbiddenException(
         'Only Head Office admins can confirm transfers',
@@ -231,7 +310,11 @@ export class DonationsService {
     }
 
     const transfer = await this.supabase.single<DonationTransfer>(
-      this.supabase.service.from('donation_transfers').select('*').eq('id', id).single(),
+      this.supabase.service
+        .from('donation_transfers')
+        .select('*')
+        .eq('id', id)
+        .single(),
       `Transfer with ID ${id} not found`,
     );
 
@@ -264,7 +347,11 @@ export class DonationsService {
     return data;
   }
 
-  async getTransfers(currentUser: User, pagination: PaginationDto, branchId?: string) {
+  async getTransfers(
+    currentUser: User,
+    pagination: PaginationDto,
+    branchId?: string,
+  ) {
     let query = this.supabase.service
       .from('donation_transfers')
       .select('*', { count: 'exact' });

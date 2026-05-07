@@ -48,8 +48,7 @@ export class UsersService {
   async findAll(pagination: PaginationDto) {
     const query = this.supabase.service
       .from('users')
-      .select('*, user_branch_roles!user_branch_roles_user_id_fkey(*)', { count: 'exact' });
-
+      .select('*, user_branch_roles!user_branch_roles_user_id_fkey(branch_id, branch_role)', { count: 'exact' });
     return this.supabase.paginate<User>(
       query.order('created_at', { ascending: false }),
       pagination,
@@ -61,7 +60,7 @@ export class UsersService {
       this.supabase.service
         .from('users')
         .select(
-          '*, user_branch_roles!user_branch_roles_user_id_fkey(*)',
+          '*, user_branch_roles!user_branch_roles_user_id_fkey(branch_id, branch_role)',
         )
         .eq('id', id)
         .single(),

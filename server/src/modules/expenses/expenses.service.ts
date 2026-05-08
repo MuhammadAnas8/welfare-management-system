@@ -2,7 +2,6 @@ import {
   Injectable,
   ForbiddenException,
   BadRequestException,
-  NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service.js';
 import { AuditService } from '../../common/audit/audit.service.js';
@@ -14,7 +13,7 @@ import { RejectExpenseDto } from './dto/reject-expense.dto.js';
 import { VoidExpenseDto } from './dto/void-expense.dto.js';
 import { ExpenseStatus, FundSource } from './enums/expense.enum.js';
 import { Expense } from './interfaces/expense.interface.js';
-import { BranchRole } from '../users/enums/roles.enum.js';
+import { BranchRole, GlobalRole } from '../users/enums/roles.enum.js';
 import { PaginationDto } from '../../common/dto/pagination.dto.js';
 import { ExpenseResponseDto } from './dto/expense-response.dto.js';
 
@@ -155,7 +154,7 @@ export class ExpensesService {
     ]);
 
     if (expense.status !== ExpenseStatus.DRAFT) {
-      throw new BadRequestException('Only draft expenses can be updated');
+      throw new BadRequestException('Approved/Rejected expenses are locked. Void and recreate instead.');
     }
 
     const data = await this.supabase.single<any>(
@@ -192,7 +191,7 @@ export class ExpensesService {
       throw new BadRequestException('Only local fund sources can be approved by branch admin');
     }
 
-    // Dynamic balance check
+    // Dynamic balance check via Ledger calculation
     const balance = await this.calculateBranchBalance(expense.branch_id);
     if (balance < expense.amount) {
       throw new BadRequestException(`Insufficient branch balance. Current: ${balance}, Required: ${expense.amount}`);
@@ -263,7 +262,7 @@ export class ExpensesService {
       throw new BadRequestException('Can only approve expenses in pending status');
     }
 
-    // Dynamic balance check for HO
+    // Dynamic balance check for HO via Ledger calculation
     const hoBalance = await this.calculateHOBalance();
     if (hoBalance < expense.amount) {
       throw new BadRequestException(`Insufficient HO balance. Current: ${hoBalance}, Required: ${expense.amount}`);
@@ -327,7 +326,6 @@ export class ExpensesService {
   async void(id: string, dto: VoidExpenseDto, currentUser: User): Promise<ExpenseResponseDto> {
     const expense = await this.getExpenseOrThrow(id);
     
-    // Check if user is HO admin OR branch admin for this branch
     const isHOAdmin = this.permissionService.isGlobalAdmin(currentUser);
     const isBranchAdmin = this.permissionService.hasBranchPermission(currentUser, expense.branch_id, [BranchRole.ADMIN]);
 
@@ -358,92 +356,29 @@ export class ExpensesService {
     return this.mapExpense(data);
   }
 
-  // --- Balance & Stats ---
+  // --- Ledger Balance & Stats (via SQL Aggregate RPCs) ---
 
   async calculateBranchBalance(branchId: string): Promise<number> {
-    // total donations
-    const { data: donations } = await this.supabase.service
-      .from('donations')
-      .select('amount')
-      .eq('branch_id', branchId)
-      .eq('is_voided', false);
-    
-    const totalDonations = donations?.reduce((acc, d) => acc + Number(d.amount), 0) || 0;
-
-    // transfers to HO (Assuming donation_transfers table handles this)
-    const { data: transfers } = await this.supabase.service
-      .from('donation_transfers')
-      .select('amount_original')
-      .eq('from_branch_id', branchId)
-      .eq('status', 'received'); // Or appropriate status
-    
-    const totalTransfersOut = transfers?.reduce((acc, t) => acc + Number(t.amount_original), 0) || 0;
-
-    // approved local expenses
-    const { data: expenses } = await this.supabase.service
-      .from('expenses')
-      .select('amount')
-      .eq('branch_id', branchId)
-      .eq('status', ExpenseStatus.APPROVED)
-      .eq('fund_source', FundSource.LOCAL)
-      .eq('is_voided', false);
-    
-    const totalExpenses = expenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0;
-
-    return totalDonations - totalTransfersOut - totalExpenses;
+    const stats = await this.supabase.service.rpc('get_branch_financial_stats', { p_branch_id: branchId });
+    return stats.data?.remaining_local_balance || 0;
   }
 
   async calculateHOBalance(): Promise<number> {
-    // received transfers (assuming they are converted to PKR in the transfers table)
-    const { data: receivedTransfers } = await this.supabase.service
-      .from('donation_transfers')
-      .select('received_pkr')
-      .eq('status', 'received');
-    
-    const totalReceived = receivedTransfers?.reduce((acc, t) => acc + Number(t.received_pkr || 0), 0) || 0;
-
-    // approved HO expenses
-    const { data: hoExpenses } = await this.supabase.service
-      .from('expenses')
-      .select('amount')
-      .eq('status', ExpenseStatus.APPROVED)
-      .eq('fund_source', FundSource.HO)
-      .eq('is_voided', false);
-    
-    const totalHOExpenses = hoExpenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0;
-
-    return totalReceived - totalHOExpenses;
+    const stats = await this.supabase.service.rpc('get_ho_financial_stats');
+    return stats.data?.ho_available_funds || 0;
   }
 
   async getBranchExpenseStats(branchId: string, currentUser: User) {
     this.permissionService.checkBranchAccess(currentUser, branchId);
-
-    const { data: expenses } = await this.supabase.service
-      .from('expenses')
-      .select('amount, status, fund_source, is_voided')
-      .eq('branch_id', branchId);
+    const stats = await this.supabase.service.rpc('get_branch_financial_stats', { p_branch_id: branchId });
     
-    const stats = {
-      total_expenses: 0,
-      approved_local: 0,
-      approved_ho: 0,
-      pending_ho: 0,
-      current_balance: await this.calculateBranchBalance(branchId),
+    // Add recent transactions
+    const recent = await this.getRecentTransactions(branchId);
+
+    return {
+      ...stats.data,
+      recent_transactions: recent
     };
-
-    expenses?.forEach(e => {
-      if (e.is_voided) return;
-      const amt = Number(e.amount);
-      if (e.status === ExpenseStatus.APPROVED) {
-        if (e.fund_source === FundSource.LOCAL) stats.approved_local += amt;
-        if (e.fund_source === FundSource.HO) stats.approved_ho += amt;
-        stats.total_expenses += amt;
-      } else if (e.status === ExpenseStatus.PENDING) {
-        stats.pending_ho += amt;
-      }
-    });
-
-    return stats;
   }
 
   async getHOExpenseStats(currentUser: User) {
@@ -451,26 +386,38 @@ export class ExpensesService {
       throw new ForbiddenException('Only HO admins can view global stats');
     }
 
+    const stats = await this.supabase.service.rpc('get_ho_financial_stats');
+    const comparisons = await this.supabase.service.rpc('get_branches_comparison');
+
+    return {
+      ...stats.data,
+      branch_comparisons: comparisons.data
+    };
+  }
+
+  private async getRecentTransactions(branchId: string) {
+    // Fetch last 5 donations and last 5 expenses
+    const { data: donations } = await this.supabase.service
+      .from('donations')
+      .select('id, donor_name, amount, currency, created_at')
+      .eq('branch_id', branchId)
+      .eq('is_voided', false)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
     const { data: expenses } = await this.supabase.service
       .from('expenses')
-      .select('amount, status, fund_source, is_voided');
-    
-    const stats = {
-      total_ho_expenses: 0,
-      pending_requests: 0,
-      ho_balance: await this.calculateHOBalance(),
-    };
+      .select('id, title, amount, status, created_at')
+      .eq('branch_id', branchId)
+      .eq('is_voided', false)
+      .order('created_at', { ascending: false })
+      .limit(5);
 
-    expenses?.forEach(e => {
-      if (e.is_voided) return;
-      const amt = Number(e.amount);
-      if (e.status === ExpenseStatus.APPROVED && e.fund_source === FundSource.HO) {
-        stats.total_ho_expenses += amt;
-      } else if (e.status === ExpenseStatus.PENDING) {
-        stats.pending_requests += amt;
-      }
-    });
+    const txs = [
+      ...(donations || []).map(d => ({ ...d, type: 'donation' })),
+      ...(expenses || []).map(e => ({ ...e, type: 'expense' }))
+    ];
 
-    return stats;
+    return txs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 }

@@ -11,6 +11,7 @@ import { AuditModule } from './common/audit/audit.module.js';
 import { BranchesModule } from './modules/branches/branches.module.js';
 import { PermissionModule } from './common/permissions/permission.module.js';
 import { DonationsModule } from './modules/donations/donations.module.js';
+import { ExpensesModule } from './modules/expenses/expenses.module.js';
 @Module({
   imports: [
     AuthModule,
@@ -20,6 +21,7 @@ import { DonationsModule } from './modules/donations/donations.module.js';
     BranchesModule,
     PermissionModule,
     DonationsModule,
+    ExpensesModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60, limit: 60 }]

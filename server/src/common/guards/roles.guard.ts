@@ -43,10 +43,6 @@ export class RolesGuard implements CanActivate {
     // 2. Check Branch Roles (if applicable)
     if (rolesMetadata.branch && rolesMetadata.branch.length > 0) {
 
-      if (this.permissionService.isGlobalAdmin(user)) {
-        return true;
-      }
-
       // Try to find branchId in request (params, body, or query)
       const branchId =
         request.params.branchId ||

@@ -246,34 +246,9 @@ export class DonationsService {
       BranchRole.ADMIN,
     ]);
 
-    // Simplified Validations using improved .single()
-    await this.supabase.single(
-      this.supabase.service
-        .from('branches')
-        .select('id')
-        .eq('id', dto.from_branch_id)
-        .single(),
-      'Source branch not found',
-    );
-
-    await this.supabase.single(
-      this.supabase.service
-        .from('branches')
-        .select('id')
-        .eq('id', dto.to_branch_id)
-        .single(),
-      'Target branch not found',
-    );
-
-    await this.supabase.single(
-      this.supabase.service
-        .from('currencies')
-        .select('code')
-        .eq('code', dto.currency_original)
-        .eq('is_active', true)
-        .single(),
-      'Invalid currency',
-    );
+    await this.validateBranch(dto.from_branch_id);
+    await this.validateBranch(dto.to_branch_id);
+    await this.validateCurrency(dto.currency_original);
 
     const data = await this.supabase.single<DonationTransfer>(
       this.supabase.service

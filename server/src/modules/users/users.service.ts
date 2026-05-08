@@ -12,6 +12,7 @@ import { GlobalRole, BranchRole } from './enums/roles.enum.js';
 import { AuditService } from '../../common/audit/audit.service.js';
 import { PermissionService } from '../../common/permissions/permission.service.js';
 import { PaginationDto } from '../../common/dto/pagination.dto.js';
+import { UserResponseDto } from './dto/user-response.dto.js';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +21,24 @@ export class UsersService {
     private readonly auditService: AuditService,
     private readonly permissionService: PermissionService,
   ) {}
+
+  private mapUser(u: any): UserResponseDto {
+    return {
+      id: u.id,
+      full_name: u.full_name,
+      email: u.email,
+      global_role: u.global_role,
+      is_active: u.is_active,
+      created_at: u.created_at,
+      branches: (u.user_branch_roles || []).map((ubr: any) => ({
+        id: ubr.id,
+        branch_id: ubr.branch_id,
+        branch_name: ubr.branches?.name || ubr.branch?.name,
+        branch_role: ubr.branch_role,
+        assigned_at: ubr.assigned_at,
+      })),
+    };
+  }
 
   private canAssignRole(
     currentUser: User,
@@ -46,37 +65,61 @@ export class UsersService {
   }
 
   async findAll(pagination: PaginationDto) {
-    const query = this.supabase.service
-      .from('users')
-      .select('*, user_branch_roles!user_branch_roles_user_id_fkey(branch_id, branch_role)', { count: 'exact' });
-    return this.supabase.paginate<User>(
+    const query = this.supabase.service.from('users').select(
+      `
+        *,
+        user_branch_roles!user_branch_roles_user_id_fkey (
+          *,
+          branches (name)
+        )
+      `,
+      { count: 'exact' },
+    );
+
+    const result = await this.supabase.paginate<any>(
       query.order('created_at', { ascending: false }),
       pagination,
     );
+
+    return {
+      ...result,
+      data: result.data.map((u) => this.mapUser(u)),
+    };
   }
 
-  async findOne(id: string) {
-    return this.supabase.single(
+  async findOne(id: string): Promise<UserResponseDto> {
+    const data = await this.supabase.single<any>(
       this.supabase.service
         .from('users')
         .select(
-          '*, user_branch_roles!user_branch_roles_user_id_fkey(branch_id, branch_role)',
+          `
+          *,
+          user_branch_roles!user_branch_roles_user_id_fkey (
+            *,
+            branches (name)
+          )
+        `,
         )
         .eq('id', id)
         .single(),
     );
+    return this.mapUser(data);
   }
 
-  async update(id: string, updateDto: UpdateUserDto, currentUser: User) {
-    // 1. Permission Check (Delegated to PermissionService)
+  async update(
+    id: string,
+    updateDto: UpdateUserDto,
+    currentUser: User,
+  ): Promise<UserResponseDto> {
     if (!this.permissionService.canUpdateUser(currentUser, id, updateDto)) {
-      throw new ForbiddenException('You do not have permission to update this user or these specific fields');
+      throw new ForbiddenException(
+        'You do not have permission to update this user or these specific fields',
+      );
     }
 
     const oldData = await this.findOne(id);
 
-    // 2. Perform update
-    const data = await this.supabase.single(
+    await this.supabase.single(
       this.supabase.service
         .from('users')
         .update(updateDto)
@@ -85,7 +128,6 @@ export class UsersService {
         .single(),
     );
 
-    // 3. Log the change
     await this.auditService.log(
       currentUser,
       'UPDATE_PROFILE',
@@ -95,7 +137,7 @@ export class UsersService {
       oldData,
     );
 
-    return data;
+    return this.findOne(id);
   }
 
   async removeBranchRole(roleId: string, currentUser: User) {
@@ -126,34 +168,32 @@ export class UsersService {
   async assignOrUpdateBranchRole(dto: AssignUserRoleDto, currentUser: User) {
     const { user_id, branch_id, branch_role } = dto;
 
-    // 1. 🔐 Authorization check
     if (!this.canAssignRole(currentUser, branch_id, branch_role)) {
       throw new ForbiddenException('You cannot assign this role');
     }
 
-    // 2. 🔍 Validate target user exists in public.users
     const userExists = await this.supabase.service
       .from('users')
       .select('id')
       .eq('id', user_id)
       .single();
-    
+
     if (userExists.error) {
-      throw new NotFoundException(`Target user with ID ${user_id} not found in public profile. Ensure they have signed up correctly.`);
+      throw new NotFoundException(
+        `Target user with ID ${user_id} not found in public profile. Ensure they have signed up correctly.`,
+      );
     }
 
-    // 3. 🔍 Validate branch exists
     const branchExists = await this.supabase.service
       .from('branches')
       .select('id')
       .eq('id', branch_id)
       .single();
-    
+
     if (branchExists.error) {
       throw new NotFoundException(`Branch with ID ${branch_id} not found.`);
     }
 
-    // 4. 🔄 UPSERT
     const { data, error } = await this.supabase.service
       .from('user_branch_roles')
       .upsert(
@@ -173,7 +213,6 @@ export class UsersService {
       throw new BadRequestException(error.message);
     }
 
-    // 5. 🧾 Audit
     await this.auditService.log(
       currentUser,
       'ASSIGN_ROLE',
@@ -182,6 +221,9 @@ export class UsersService {
       { branch_id, branch_role, target_user_id: user_id },
     );
 
-    return { message: 'Role assigned successfully', data };
+    return {
+      message: 'Role assigned successfully',
+      data: await this.findOne(user_id),
+    };
   }
 }
